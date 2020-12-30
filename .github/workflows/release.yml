@@ -19,7 +19,7 @@ jobs:
       - name: "Build project and publish to PyPi"
         run: |
           source $HOME/.poetry/env
-          poetry install
+          poetry install --no-dev
           poetry build
           poetry publish -u $USERNAME -p $PASSWORD
         env:
