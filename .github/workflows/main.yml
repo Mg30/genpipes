@@ -1,4 +1,4 @@
-name: pandas-pipeline-tests
+name: genpipes-tests
 
 on: [push]
 
