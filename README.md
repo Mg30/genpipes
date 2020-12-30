@@ -1,4 +1,4 @@
-# Pandas Pipeline
+# Genpipes
 Library to write readable and reproductible pipelines using decorators and generators.
 
 ## Installation
