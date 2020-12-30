@@ -1,5 +1,7 @@
+![alt](https://img.shields.io/github/workflow/status/Mg30/genpipes/genpipes-tests)
 # Genpipes
 Library to write readable and reproductible pipelines using decorators and generators.
+Tested for Python > 3.6.9.
 
 ## Installation
 `pip install genpipes`
