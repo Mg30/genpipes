@@ -26,7 +26,7 @@ jobs:
       - name: Formatting with blake
         run: |
           source $HOME/.poetry/env
-          poetry run black pandas_pipeline 
+          poetry run black genpipes 
       - name: Lint with flake8
         run: |
           # stop the build if there are Python syntax errors or undefined names
