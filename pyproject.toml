@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "genpipes"
 version = "0.1.0"
-description = "Simple library to compose pipelinein the sklearn way thanks to generators"
+description = "Simple library to compose pipeline in the sklearn way thanks to generators"
 authors = ["Matt G."]
 repository = "https://github.com/Mg30/genpipes"
 readme = "README.md"

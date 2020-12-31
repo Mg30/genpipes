@@ -1,4 +1,5 @@
 ![alt](https://img.shields.io/github/workflow/status/Mg30/genpipes/genpipes-tests)
+[![Downloads](https://pepy.tech/badge/genpipes)](https://pepy.tech/project/genpipes)
 # Genpipes
 Library to write readable and reproductible pipelines using decorators and generators.
 Tested for Python > 3.6.9.
