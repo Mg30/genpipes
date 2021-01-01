@@ -18,6 +18,7 @@ This quick start assume that you have pandas installed as dependency in you proj
 
 import pandas as pd
 from genpipes import declare, compose
+from collections.abc import Iterable
 
 @declare.generator()
 @declare.datasource(inputs=["some_file.csv"])
@@ -34,7 +35,7 @@ def filter_by(stream: Iterable[pd.DataFrame], col_to_filter:str, value:str):
 
 pipe = compose.Pipeline(steps=[
     ("fetching datasource from some csv file", data_to_be_processed, {}),
-    ("performing some filtering based on col1",filter_by, {value:"some_value"} )
+    ("performing some filtering based on col1", filter_by, {"value": "some_value"} )
 ])
 
 output = pipe.run()
@@ -121,7 +122,7 @@ def merging_data(input_one:Callable, input_two:Callable) -> pd.DataFrame:
     return df_merged
 
 ```
-Decorated function will not received the value from the stream. But the wrapper does receive the valeu from stream and push it downstream unchanged. 
+Decorated function will not received the value from the stream. But the wrapper does receive the value from stream and push it downstream unchanged. 
 
 That's why when calling  your function once decorated you have to pass it as first argument a generator object, so if you want to test you function you can do like that:
 ```python
