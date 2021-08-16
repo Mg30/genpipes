@@ -36,7 +36,7 @@ def generator(inputs: List = None) -> Callable:
         def wrapper(stream: types.GeneratorType, **kwargs) -> Any:
 
             yield from stream  # pulling the value unchanged from the stream
-            if isinstance(func(*inputs), types.GeneratorType):
+            if isinstance(func(*inputs, **kwargs), types.GeneratorType):
                 yield from func(*inputs, **kwargs)
             else:
                 value = func(*inputs, **kwargs)
