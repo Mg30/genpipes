@@ -20,9 +20,10 @@ class Pipeline(object):
 
     def __repr__(self) -> str:
         """Implementation of repr to show tasks composing the current pipeline"""
+        names = []
         for index, task in enumerate(self.steps):
-            self.names.append(f"{index+1}- {task[0]}")
-        tasks = "\n".join(self.names)
+            names.append(f"{index+1}- {task[0]}")
+        tasks = "\n".join(names)
         rpr = f"""---- Start ----
 {tasks}
 ---- End ----
