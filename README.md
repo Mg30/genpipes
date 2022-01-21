@@ -21,7 +21,6 @@ from genpipes import declare, compose
 from collections.abc import Iterable
 
 @declare.generator()
-@declare.datasource(inputs=["some_file.csv"])
 def data_to_be_processed(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
@@ -51,7 +50,7 @@ The decorators take in a list of inputs to be passed as positional arguments to 
 import pandas as pd
 from genpipes import declare
 
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_to_be_processed(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
@@ -69,7 +68,7 @@ However if you want to let some arguments be defined later you could use keyword
 import pandas as pd
 from genpipes import declare
 
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_to_be_processed(path:str, read_options:dict) -> pd.DataFrame:
     df = pd.read_csv(path, **read_options)
     return df
@@ -83,15 +82,14 @@ df = data_to_be_processed(read_options={"encoding":"latin1"})
 
 ### Declaring generator
 
-`generator` decorator is use to initialize a stream.  **Function decorated are transformed to a Python generator object**. You can decorate any function like a `@datasource`.
+`generator` decorator is use to initialize a stream.  **Function decorated are transformed to a Python generator object**. You can decorate any function like a `@generator`.
 
 ```python
 
 import pandas as pd
 from genpipes import declare, compose
 
-@declare.generator()
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_to_be_processed(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
@@ -103,12 +101,12 @@ Or a more complexe function
 import pandas as pd
 from genpipes import declare, compose
 
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_one(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
 
-@declare.datasource(inputs=["some_file_bis.csv"])
+@declare.generator(inputs=["some_file_bis.csv"])
 def data_two(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
@@ -158,12 +156,12 @@ Now that we have seen how to declare data sources and how to generate a stream t
 import pandas as pd
 from genpipes import declare, compose
 
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_one(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
 
-@declare.datasource(inputs=["some_file_bis.csv"])
+@declare.generator(inputs=["some_file_bis.csv"])
 def data_two(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
@@ -198,12 +196,12 @@ def deduplicate(stream:Iterable[pd.DataFrame], subset:List):
 import pandas as pd
 from genpipes import compose, declare
 
-@declare.datasource(inputs=["some_file.csv"])
+@declare.generator(inputs=["some_file.csv"])
 def data_one(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df
 
-@declare.datasource(inputs=["some_file_bis.csv"])
+@declare.generator(inputs=["some_file_bis.csv"])
 def data_two(path:str) -> pd.DataFrame:
     df = pd.read_csv(path)
     return df

@@ -1,27 +1,6 @@
 import functools
-from typing import Any, Callable, List, Generator
+from typing import Any, Callable, List
 import types
-
-
-def datasource(inputs: List = None) -> Callable:
-    """Decorator function to declare a datasource,
-    inputs are forwarded to decorated function as positional args.
-
-    datasource are NOT lazily evaluated.
-    """
-    if not inputs:
-        inputs = []
-
-    def decorator(func) -> Callable:
-        @functools.wraps(func)
-        def wrapper(**kwargs) -> Any:
-
-            value = func(*inputs, **kwargs)
-            return value
-
-        return wrapper
-
-    return decorator
 
 
 def generator(inputs: List = None) -> Callable:
