@@ -4,7 +4,7 @@ import pytest
 
 
 def test_version():
-    assert __version__ == "0.1.2"
+    assert __version__ == "1.0.0"
 
 
 @pytest.fixture
@@ -23,37 +23,6 @@ def fake_stream():
 def fake_stream_bis():
     stream = (i for i in range(0, 1))
     return stream
-
-
-def test_datasource_inputs():
-    inputs = ["is passed"]
-
-    @declare.datasource(inputs=inputs)
-    def some_function(positinal_input):
-        return positinal_input
-
-    assert some_function() == inputs[0]
-
-
-def test_datasource_inputs_named():
-    inputs = ["is passed"]
-    named_args = {"named_args": 0}
-
-    @declare.datasource(inputs=inputs)
-    def some_function(positinal_input, named_args: int):
-        return positinal_input, named_args
-
-    postional, kwargs = some_function(**named_args)
-    assert postional == inputs[0]
-    assert kwargs == named_args["named_args"]
-
-
-def test_datasource_no_inputs():
-    @declare.datasource()
-    def some_function():
-        return True
-
-    assert some_function()
 
 
 def test_generator_inputs(empty_stream):

@@ -7,11 +7,10 @@ import pytest
 
 
 def test_version():
-    assert __version__ == "0.1.2"
+    assert __version__ == "1.0.0"
 
 
 @declare.generator()
-@declare.datasource()
 def fake_dataframe():
     df = pd.DataFrame({"col1": [1, 2, 3, 4, 5, 6], "col2": [1, 2, 3, 4, 5, 6]})
     return df
@@ -77,11 +76,13 @@ def test_pipeline_output(pipe, expected_output):
     output = pipe.run()
     assert expected_output.equals(output)
 
+
 def test_pipeline_multiple_run(pipe, expected_output):
     output_one = pipe.run()
     output_two = pipe.run()
     assert expected_output.equals(output_one)
     assert expected_output.equals(output_two)
+
 
 def test_pipeline_with_another_pipeline_instance(pipe_bis, expected_output):
     composed_pipe = compose.Pipeline(
@@ -98,7 +99,7 @@ def test_pipeline_with_another_pipeline_instance_with_kwargs(pipe_bis, expected_
     composed_pipe = compose.Pipeline(
         steps=[
             ("other pipeline instance", pipe_bis, {}),
-            ("multiply df with provided number", multiply_by, {"number":10}),
+            ("multiply df with provided number", multiply_by, {"number": 10}),
         ]
     )
     df = composed_pipe.run()
