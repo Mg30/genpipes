@@ -27,8 +27,8 @@ def generator(inputs: List = None) -> Callable:
 
 
 def processor(inputs: List = None) -> Callable:
-    """Decorator function to declare function that need value from the stream. Forward any inputs to
-    decorated function"""
+    """Decorator function to declare function that need value from the stream.
+    Forward any inputs to decorated function"""
     if not inputs:
         inputs = []
 
