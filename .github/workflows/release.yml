@@ -1,27 +1,25 @@
-name: genpipes-release
-on:
-  release:
-    # Only use the types keyword to narrow down the activity types that will trigger your workflow.
-    types: [published]
+name: Build and release package
 
+on:
+  push:
+    tags:
+      - '*'
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
-          python-version: 3.8
-      - name: Install poetry
+          python-version: "3.9"
+      - name: Run image
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: "1.2.2"
+      - name: publish package to pypi
         run: |
-          curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python -
-      - name: "Build project and publish to PyPi"
-        run: |
-          source $HOME/.poetry/env
-          poetry install --no-dev
-          poetry build
-          poetry publish -u $USERNAME -p $PASSWORD
+          poetry config pypi-token.genpipes $PYPITOKEN
+          poetry publish --build
         env:
-          USERNAME: ${{secrets.USERNAME}}
-          PASSWORD: ${{secrets.PASSWORD}}
+          PYPITOKEN: ${{secrets.PYPITOKEN}}
