@@ -1,13 +1,8 @@
 import types
 from typing import Iterable
-from genpipes import __version__
 from genpipes import compose, declare
 import pandas as pd
 import pytest
-
-
-def test_version():
-    assert __version__ == "1.0.0"
 
 
 @declare.generator()
