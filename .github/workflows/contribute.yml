@@ -1,0 +1,28 @@
+name: Python CI
+
+on:
+  push:
+    branches:
+      - "feature/*"
+      - "hotfix/*"
+
+jobs:
+  test:
+    runs-on: ubuntu-18.04
+    strategy:
+      matrix:
+        python-version: ['3.7',3.8', '3.9', '3.10', '3.11']
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run image
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: '1.2.2'
+      - name: Install Project with poetry
+        run: poetry install
+      - name: Run Project tests with poetry
+        run: poetry run pytest --cov pydwt/ tests/
