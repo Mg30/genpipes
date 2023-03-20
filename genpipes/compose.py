@@ -6,7 +6,9 @@ class Pipeline(object):
     Thanks to Generetors Tasks are lazily evaluated until run method is call.
     """
 
-    def __init__(self, steps: List[Union[Tuple[str, Callable], Tuple[str, Callable, Dict]]]) -> None:
+    def __init__(
+        self, steps: List[Union[Tuple[str, Callable], Tuple[str, Callable, Dict]]]
+    ) -> None:
         self.stream = ()  # empty generator needed to init the stream
         self.steps = steps
         self.output = None
