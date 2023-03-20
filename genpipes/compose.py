@@ -1,8 +1,9 @@
-from typing import Any, Callable, Generator, List, Tuple, Optional, Dict, Union
+from typing import Any, Callable, Generator, List, Tuple, Dict, Union
 
 
 class Pipeline(object):
-    """Class that contains steps representing operations to be sequentially executed.
+    """Class that contains steps representing operations 
+    to be sequentially executed.
     Thanks to Generetors Tasks are lazily evaluated until run method is call.
     """
 
