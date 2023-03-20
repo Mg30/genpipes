@@ -1,4 +1,4 @@
-name: Python CI
+name: Python contribute
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-18.04
     strategy:
       matrix:
-        python-version: ['3.7',3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.8', '3.9', '3.10', '3.11']
     steps:
       - uses: actions/checkout@v3
       - name: Set up Python
@@ -25,4 +25,4 @@ jobs:
       - name: Install Project with poetry
         run: poetry install
       - name: Run Project tests with poetry
-        run: poetry run pytest --cov pydwt/ tests/
+        run: poetry run pytest --cov genpipes/ tests/
