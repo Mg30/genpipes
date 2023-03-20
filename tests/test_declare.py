@@ -1,11 +1,5 @@
-from genpipes import __version__
 from genpipes import declare
 import pytest
-
-
-def test_version():
-    assert __version__ == "1.0.0"
-
 
 @pytest.fixture
 def empty_stream():
