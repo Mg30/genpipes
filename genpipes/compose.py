@@ -16,7 +16,8 @@ class Pipeline(object):
         self.names = []
 
     def __call__(self, gen) -> Generator:
-        """ Implementation of special call method to allow a Pipeline object to receive an other Pipeline object"""
+        """ Implementation of special call method to allow a Pipeline object to receive 
+        an other Pipeline object"""
         self.stream = gen
         self.prepare()
         return self.stream
