@@ -7,7 +7,7 @@ repository = "https://github.com/Mg30/genpipes"
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8.1"
+python = "^3.8.0"
 
 
 [tool.poetry.group.dev.dependencies]
