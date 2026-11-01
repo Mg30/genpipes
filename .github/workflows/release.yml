@@ -1,25 +1,30 @@
-name: Build and release package
+name: Release
 
 on:
   push:
-    tags:
-      - '*'
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
 jobs:
+  validate:
+    name: Validate tagged commit
+    uses: ./.github/workflows/ci.yml
+
   publish:
-    runs-on: ubuntu-18.04
+    name: Publish to PyPI
+    needs: validate
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/genpipes
+    permissions:
+      id-token: write
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          python-version: "3.9"
-      - name: Run image
-        uses: abatilo/actions-poetry@v2
-        with:
-          poetry-version: "1.2.2"
-      - name: publish package to pypi
-        run: |
-          poetry config pypi-token.genpipes $PYPITOKEN
-          poetry publish --build
-        env:
-          PYPITOKEN: ${{secrets.PYPITOKEN}}
+          name: python-distributions
+          path: dist/
+      - name: Publish verified distributions with OIDC
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
