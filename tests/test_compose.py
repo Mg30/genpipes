@@ -1,101 +1,126 @@
-import types
-from typing import Iterable
-from genpipes import compose, declare
-import pandas as pd
+from collections.abc import Iterable, Iterator
+
 import pytest
 
-
-@declare.generator()
-def fake_dataframe():
-    df = pd.DataFrame({"col1": [1, 2, 3, 4, 5, 6], "col2": [1, 2, 3, 4, 5, 6]})
-    return df
+from genpipes import Pipeline
 
 
-@declare.processor()
-def multiply_by(stream: Iterable[pd.DataFrame], number: int = 2):
-    for df in stream:
-        cols = df.columns
-        for col in cols:
-            df[col] = df[col] * number
+def test_source_is_lazy_and_called_once_per_traversal() -> None:
+    calls: list[int] = []
 
-        yield df
+    def load() -> Iterator[int]:
+        calls.append(1)
+        return iter([len(calls)])
 
-
-@pytest.fixture
-def pipe():
-    return compose.Pipeline(
-        steps=[
-            ("fetching source", fake_dataframe, {}),
-            ("multiply by two", multiply_by, {}),
-        ]
-    )
+    pipeline = Pipeline(load)
+    stream = iter(pipeline)
+    assert calls == []
+    assert list(stream) == [1]
+    assert list(pipeline) == [2]
+    assert calls == [1, 1]
 
 
-@pytest.fixture
-def pipe_bis():
-    return compose.Pipeline(steps=[("fetching source", fake_dataframe, {})])
+def test_processor_runs_once_and_changes_the_item_type() -> None:
+    calls: list[int] = []
+
+    def render(stream: Iterable[int]) -> Iterator[str]:
+        calls.append(1)
+        return (str(value) for value in stream)
+
+    pipeline = Pipeline(lambda: iter([1, 2])).then(render)
+    assert calls == []
+    assert list(pipeline) == ["1", "2"]
+    assert calls == [1]
 
 
-@pytest.fixture
-def expected_output():
-    df = pd.DataFrame({"col1": [1, 2, 3, 4, 5, 6], "col2": [1, 2, 3, 4, 5, 6]})
-    cols = df.columns
-    for col in cols:
-        df[col] = df[col] * 2
-    return df
+def test_run_returns_last_item_and_does_not_retain_empty_output() -> None:
+    values = [1, 42]
+    pipeline = Pipeline(lambda: iter(values))
+    assert pipeline.run() == 42
+    values.clear()
+    assert pipeline.run() is None
 
 
-def test_pipeline_rpr(pipe):
-    assert isinstance(str(pipe), str)
+def test_independent_iterators_and_branches() -> None:
+    def double(stream: Iterable[int]) -> Iterator[int]:
+        return (value * 2 for value in stream)
+
+    original = Pipeline(lambda: iter([1, 2, 3]))
+    doubled = original.then(double)
+    first = iter(doubled)
+    second = iter(doubled)
+    assert next(first) == 2
+    assert next(first) == 4
+    assert next(second) == 2
+    assert list(original) == [1, 2, 3]
+    assert list(first) == [6]
+    assert list(second) == [4, 6]
+    assert list(doubled) == [2, 4, 6]
 
 
-def test_subscriptable(pipe):
-    assert pipe["fetching source"] == ("fetching source", fake_dataframe, {})
+def test_partial_consumption_only_pulls_requested_items() -> None:
+    seen: list[int] = []
+
+    def load() -> Iterator[int]:
+        for value in range(3):
+            seen.append(value)
+            yield value
+
+    pipeline = Pipeline(load)
+    stream = iter(pipeline)
+    assert next(stream) == 0
+    assert seen == [0]
+    assert list(pipeline) == [0, 1, 2]
+    assert list(stream) == [1, 2]
 
 
-def test_subscriptable_not_found(pipe):
-    with pytest.raises(KeyError):
-        pipe["prout"]
+def test_source_errors_propagate_and_next_run_starts_fresh() -> None:
+    fail = True
+
+    def load() -> Iterator[int]:
+        yield 1
+        if fail:
+            raise ValueError("source unavailable")
+        yield 2
+
+    pipeline = Pipeline(load)
+    with pytest.raises(ValueError, match="source unavailable"):
+        pipeline.run()
+    fail = False
+    assert list(pipeline) == [1, 2]
 
 
-def test_callable_pipeline(pipe_bis):
-    assert isinstance(pipe_bis(multiply_by), types.GeneratorType)
+def test_processor_error_is_not_swallowed() -> None:
+    def reject(stream: Iterable[int]) -> Iterator[int]:
+        for _ in stream:
+            raise ValueError("invalid record")
+        return iter(())
+
+    pipeline = Pipeline(lambda: iter([1])).then(reject)
+    with pytest.raises(ValueError, match="invalid record"):
+        pipeline.run()
 
 
-def test_prepare(pipe):
-    pipe.prepare()
-    assert isinstance(pipe.stream, types.GeneratorType)
+def test_sources_can_compose_existing_pipelines() -> None:
+    left = Pipeline(lambda: iter([1, 2]))
+    right = Pipeline(lambda: iter([3]))
+
+    def combined() -> Iterator[int]:
+        yield from left
+        yield from right
+
+    pipeline = Pipeline(combined)
+    assert list(pipeline) == [1, 2, 3]
+    assert list(pipeline) == [1, 2, 3]
 
 
-def test_pipeline_output(pipe, expected_output):
-    output = pipe.run()
-    assert expected_output.equals(output)
+def test_yielded_batches_are_not_flattened() -> None:
+    batch = ["first", "second"]
+    pipeline = Pipeline(lambda: iter([batch]))
+    assert list(pipeline) == [batch]
+    assert pipeline.run() is batch
 
 
-def test_pipeline_multiple_run(pipe, expected_output):
-    output_one = pipe.run()
-    output_two = pipe.run()
-    assert expected_output.equals(output_one)
-    assert expected_output.equals(output_two)
-
-
-def test_pipeline_with_another_pipeline_instance(pipe_bis, expected_output):
-    composed_pipe = compose.Pipeline(
-        steps=[
-            ("other pipeline instance", pipe_bis, {}),
-            ("multiply by two", multiply_by, {}),
-        ]
-    )
-    df = composed_pipe.run()
-    assert df.equals(expected_output)
-
-
-def test_pipeline_with_another_pipeline_instance_with_kwargs(pipe_bis, expected_output):
-    composed_pipe = compose.Pipeline(
-        steps=[
-            ("other pipeline instance", pipe_bis, {}),
-            ("multiply df with provided number", multiply_by, {"number": 10}),
-        ]
-    )
-    df = composed_pipe.run()
-    assert not df.equals(expected_output)
+def test_strings_are_items_when_explicitly_yielded() -> None:
+    pipeline = Pipeline(lambda: iter(["hello", "world"]))
+    assert list(pipeline) == ["hello", "world"]

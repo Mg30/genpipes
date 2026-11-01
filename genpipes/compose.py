@@ -1,60 +1,37 @@
-from typing import Any, Callable, Generator, List, Tuple, Dict, Union
+"""Lazy, typed pipeline composition."""
+
+from __future__ import annotations
+
+from collections.abc import Callable, Iterable, Iterator
 
 
-class Pipeline(object):
-    """Class that contains steps representing operations 
-    to be sequentially executed.
-    Thanks to Generetors Tasks are lazily evaluated until run method is call.
+class Pipeline[T]:
+    """A reusable definition that creates a fresh stream on each traversal.
+
+    The source must return a new iterator each time it is called. Genpipes
+    isolates execution state, but does not copy items or user-owned state.
     """
 
-    def __init__(
-        self, steps: List[Union[Tuple[str, Callable], Tuple[str, Callable, Dict]]]
-    ) -> None:
-        self.stream = ()  # empty generator needed to init the stream
-        self.steps = steps
-        self.output = None
-        self.names = []
+    __slots__ = ("_source",)
 
-    def __call__(self, gen) -> Generator:
-        """ Implementation of special call method to allow a Pipeline object to receive 
-        an other Pipeline object"""
-        self.stream = gen
-        self.prepare()
-        return self.stream
+    def __init__(self, source: Callable[[], Iterator[T]]) -> None:
+        self._source = source
 
-    def __repr__(self) -> str:
-        """Implementation of repr to show tasks composing the current pipeline"""
-        names = []
-        for index, task in enumerate(self.steps):
-            names.append(f"{index+1}- {task[0]}")
-        tasks = "\n".join(names)
-        rpr = f"""---- Start ----
-{tasks}
----- End ----
-        """
-        return rpr
+    def __iter__(self) -> Iterator[T]:
+        """Invoke the source once, when consumption starts."""
+        yield from self._source()
 
-    def __getitem__(self, item):
-        founded = False
-        i = 0
-        step = None
-        while not founded and i != len(self.steps) - 1:
-            step = self.steps[i]
-            founded = step[0] == item
-            i += 1
-        if founded:
-            return step
-        else:
-            raise KeyError
+    def then[U](self, processor: Callable[[Iterable[T]], Iterator[U]]) -> Pipeline[U]:
+        """Return a new pipeline with a processor, leaving this one unchanged."""
 
-    def prepare(self) -> None:
-        """Preparing the stream of tasks, does not execute the pipeline """
-        for name, step, kwargs in self.steps:
-            self.stream = step(self.stream, **kwargs)
+        def source() -> Iterator[U]:
+            return processor(iter(self))
 
-    def run(self) -> Any:
-        """Executing the pipeline and return the last value of it"""
-        self.prepare()
-        for step in self.stream:
-            self.output = step
-        return self.output
+        return Pipeline(source)
+
+    def run(self) -> T | None:
+        """Consume this traversal and return its last item, or None if empty."""
+        result: T | None = None
+        for item in self:
+            result = item
+        return result
