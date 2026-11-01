@@ -1,135 +1,196 @@
 # Genpipes
 
-Composable Python data pipelines using decorators and generators. Declare data
-sources, transform their output as a stream, and assemble reusable pipeline steps.
-The library has no runtime dependencies.
+Typed, lazy Python data pipelines using decorators and generators. Bind source
+arguments, compose stream processors, and consume the result when needed.
 
-## Installation and compatibility
+Genpipes requires **Python 3.12+** and has **no runtime dependencies**. It provides
+synchronous stream composition; scheduling, persistence, retries, and distributed
+execution are outside its scope.
+
+## Installation
+
+This branch prepares **3.0.0**, with breaking changes from 2.x. To try v3 before
+it is published, install from a checkout of this branch:
 
 ```bash
-pip install genpipes
+python -m pip install .
 ```
 
-Package metadata requires Python **>=3.8,<4.0**. The existing CI configuration
-lists Python 3.8–3.11, but uses the retired `ubuntu-18.04` runner; it does not
-establish current test results or compatibility with newer Python versions.
-The package version is 2.0.1. Pandas is optional and only needed for DataFrame examples.
+After the 3.x release is published to PyPI:
+
+```bash
+python -m pip install "genpipes>=3,<4"
+```
+
+Existing users should read the [v2 to v3 migration guide](docs/migration-v3.md).
+The CI matrix covers CPython 3.12–3.15 on Linux.
 
 ## Quick start
 
-This example runs without external files or third-party dependencies:
-
 ```python
-from genpipes import compose, declare
+from collections.abc import Iterable, Iterator
+
+from genpipes import processor, source
 
 
-@declare.generator()
-def orders():
-    return [
-        {"id": 1, "status": "ready"},
-        {"id": 2, "status": "pending"},
-        {"id": 3, "status": "ready"},
-    ]
+@source
+def numbers(stop: int) -> Iterator[int]:
+    yield from range(stop)
 
 
-@declare.processor(inputs=["ready"])
-def filter_status(stream, status):
-    for batch in stream:
-        yield [order for order in batch if order["status"] == status]
+@processor
+def multiply(stream: Iterable[int], factor: int) -> Iterator[int]:
+    for value in stream:
+        yield value * factor
 
 
-pipeline = compose.Pipeline(steps=[
-    ("load orders", orders, {}),
-    ("keep ready orders", filter_status, {}),
-])
+pipeline = numbers(3).then(multiply(10))
 
-result = pipeline.run()
-assert [order["id"] for order in result] == [1, 3]
+assert list(pipeline) == [0, 10, 20]
+assert pipeline.run() == 20
+assert list(pipeline) == [0, 10, 20]  # A fresh traversal.
 ```
 
-A step is a three-element tuple: a description, a callable, and a dictionary of
-keyword arguments. Constructing a pipeline does not execute it. `run()` consumes
-the stream and returns its **last emitted value**, not a list of all values.
+Calling a decorated source binds its arguments and returns a `Pipeline[T]`.
+Calling a decorated processor binds every argument after its upstream iterable;
+pass the resulting callable to `.then(...)`. The type checker tracks each
+stage's item type and rejects incompatible connections.
 
-## Data sources
+Constructing, extending, or obtaining an iterator from a pipeline does not invoke
+its source or processors. Execution starts when that iterator is consumed.
+Each traversal invokes each reached stage once; processors decide how much of
+their upstream stream to consume.
 
-`@declare.generator(inputs=[...])` binds positional arguments to a source. Step
-keyword arguments are forwarded to that source when the stream is consumed.
-The wrapper first forwards upstream values, then yields the source's result.
-If the source returns a generator, its values are yielded individually.
+## Items and batches
 
-For a CSV source, install pandas separately and provide an existing CSV file:
+Sources return iterators. Use `yield` for one item or batch and `yield from`
+for multiple items. Genpipes does not guess whether an iterable is a batch.
 
 ```python
+from collections.abc import Iterator
+
+from genpipes import source
+
+
+@source
+def batches() -> Iterator[list[int]]:
+    yield [1, 2, 3]
+
+
+assert list(batches()) == [[1, 2, 3]]
+```
+
+The same rule applies to strings, dictionaries, and pandas DataFrames. For
+DataFrame pipelines, install pandas separately and explicitly yield each frame:
+
+```python
+from collections.abc import Iterable, Iterator
+
 import pandas as pd
-from genpipes import declare
+
+from genpipes import processor, source
 
 
-@declare.generator(inputs=["orders.csv"])
-def read_orders(path, encoding="utf-8"):
-    return pd.read_csv(path, encoding=encoding)
+@source
+def frames() -> Iterator[pd.DataFrame]:
+    yield pd.DataFrame({"id": [1, 1, 2]})
 
 
-# Decorated sources require an upstream iterable, even when called directly.
-frame = next(read_orders((), encoding="utf-8"))
-```
-
-In a pipeline, use `("read CSV", read_orders, {"encoding": "utf-8"})`;
-`Pipeline` supplies the upstream iterable.
-
-Source functions should avoid side effects: the current `generator` wrapper may
-invoke a source more than once while evaluating its result.
-
-## Processing a stream
-
-`@declare.processor()` wraps a generator function whose first argument is the
-upstream iterable. Each yielded value becomes input for the next step.
-
-For pandas DataFrames, a deduplication processor can be written as:
-
-```python
-from genpipes import declare
-
-
-@declare.processor()
-def deduplicate(stream, subset):
+@processor
+def deduplicate(
+    stream: Iterable[pd.DataFrame], subset: list[str]
+) -> Iterator[pd.DataFrame]:
     for frame in stream:
         yield frame.drop_duplicates(subset=subset)
+
+
+result = frames().then(deduplicate(["id"])).run()
+assert result is not None
+assert result["id"].tolist() == [1, 2]
 ```
 
-Pass column names as a flat list, for example
-`("deduplicate orders", deduplicate, {"subset": ["id"]})`.
+## Composition without decorators
 
-## Composing pipelines
-
-Pipelines are callable and can serve as steps in other pipelines. Continuing the
-quick-start example:
+Decorators are argument-binding helpers. A plain source factory and processor
+work directly:
 
 ```python
-@declare.processor()
-def count_orders(stream):
-    for batch in stream:
-        yield len(batch)
+from collections.abc import Iterable, Iterator
+
+from genpipes import Pipeline
 
 
-summary = compose.Pipeline(steps=[
-    ("ready orders", pipeline, {}),
-    ("count", count_orders, {}),
-])
+def load() -> Iterator[int]:
+    return iter([1, 2, 3])
 
-assert summary.run() == 2
+
+def render(stream: Iterable[int]) -> Iterator[str]:
+    return (f"item:{value}" for value in stream)
+
+
+original = Pipeline(load)
+rendered = original.then(render)
+
+assert list(original) == [1, 2, 3]
+assert list(rendered) == ["item:1", "item:2", "item:3"]
 ```
 
-Calling `run()` again evaluates the steps again. Genpipes does not provide
-scheduling, persistence, retries, or distributed execution.
+`.then(...)` returns a new pipeline, so a prefix can be reused in multiple
+branches. To combine existing pipelines, yield from them in a new source:
+
+```python
+def combined() -> Iterator[int]:
+    yield from original
+    yield from original
+
+
+assert list(Pipeline(combined)) == [1, 2, 3, 1, 2, 3]
+```
+
+## Execution contract
+
+- `iter(pipeline)` creates an independent lazy traversal; `list(pipeline)`
+  collects all emitted items.
+- `run()` consumes a traversal and returns its last item, or `None` if empty.
+  An empty stream and a last item of `None` intentionally have the same result.
+- A source must create a **fresh iterator per call**. Reusing a captured,
+  exhausted iterator does not make its data replayable.
+- Pipeline execution state is local to each traversal. Bound arguments and
+  emitted objects are not copied; their mutability and external side effects
+  remain the caller's responsibility.
+- Exceptions propagate to the consumer. A later traversal starts fresh; it does
+  not resume or retry the failed traversal.
+- Laziness follows the processors you write. A processor that materializes its
+  entire input will do so when reached. Manage external resource lifetimes in
+  your source/processor code, especially when stopping consumption early.
+
+The public interface is `Pipeline`, `source`, and `processor`, imported from
+`genpipes`. The distribution includes `py.typed` for downstream type checking.
 
 ## Development
 
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and work from
+the repository root:
+
 ```bash
-poetry install
-poetry run pytest
+uv sync --locked
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy
+uv run pytest --cov --cov-report=term-missing
+uv run python examples/quickstart.py
+uv build --no-sources
+uv run twine check --strict dist/*
 ```
+
+Use `uv run ruff format .` to apply formatting locally. Commit `uv.lock` when
+changing development dependencies. CI uses the same locked environment, checks
+types and formatting, runs the Python matrix, and tests the built wheel outside
+the checkout.
+
+See [release instructions](docs/releasing.md) for the GitHub OIDC/PyPI Trusted
+Publishing setup and [CHANGELOG.md](CHANGELOG.md) for v3 changes.
 
 ## License
 
-[GPL-3.0](LICENSE).
+[GNU GPL version 3](LICENSE). The license file is unchanged by v3.
