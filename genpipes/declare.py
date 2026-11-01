@@ -1,42 +1,42 @@
-import functools
-from typing import Any, Callable, List
-import types
+"""Typed argument binding for sources and stream processors."""
+
+from collections.abc import Callable, Iterable, Iterator
+from functools import wraps
+from typing import Concatenate
+
+from genpipes.compose import Pipeline
 
 
-def generator(inputs: List = None) -> Callable:
-    """Decorator function to put value from a decorated function into a stream.
-    Forward inputs tas positional args to decorated function
+def source[**P, T](func: Callable[P, Iterator[T]]) -> Callable[P, Pipeline[T]]:
+    """Turn an iterator factory into a lazy pipeline factory.
+
+    Call the decorated function with its normal arguments to bind them.
+    The underlying function runs only when the resulting pipeline is consumed.
+    Use yield for one item or batch, and yield from for multiple items.
     """
-    if not inputs:
-        inputs = []
 
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(stream: types.GeneratorType, **kwargs) -> Any:
+    @wraps(func)
+    def bind(*args: P.args, **kwargs: P.kwargs) -> Pipeline[T]:
+        return Pipeline(lambda: func(*args, **kwargs))
 
-            yield from stream  # pulling the value unchanged from the stream
-            if isinstance(func(*inputs, **kwargs), types.GeneratorType):
-                yield from func(*inputs, **kwargs)
-            else:
-                value = func(*inputs, **kwargs)
-                yield value
-
-        return wrapper
-
-    return decorator
+    return bind
 
 
-def processor(inputs: List = None) -> Callable:
-    """Decorator function to declare function that need value from the stream.
-    Forward any inputs to decorated function"""
-    if not inputs:
-        inputs = []
+def processor[T, U, **P](
+    func: Callable[Concatenate[Iterable[T], P], Iterator[U]],
+) -> Callable[P, Callable[[Iterable[T]], Iterator[U]]]:
+    """Bind a processor's arguments, leaving its upstream iterable unbound.
 
-    def decorator(func: Callable) -> Callable:
-        @functools.wraps(func)
-        def wrapper(stream: types.GeneratorType, **kwargs) -> Any:
-            yield from func(stream, *inputs, **kwargs)
+    The decorated function's first argument is the input stream. Calling the
+    decorator result supplies the remaining arguments and returns a callable
+    suitable for Pipeline.then().
+    """
 
-        return wrapper
+    @wraps(func)
+    def bind(*args: P.args, **kwargs: P.kwargs) -> Callable[[Iterable[T]], Iterator[U]]:
+        def process(stream: Iterable[T]) -> Iterator[U]:
+            return func(stream, *args, **kwargs)
 
-    return decorator
+        return process
+
+    return bind
